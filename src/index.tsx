@@ -9,6 +9,7 @@ import notificationsRoutes from './routes/notifications'
 import usersRoutes from './routes/users'
 import reliefRoutes from './routes/relief'
 import incidentsRoutes from './routes/incidents'
+import pagesRoutes from './routes/pages'
 
 const app = new Hono<AppEnv>()
 
@@ -23,8 +24,6 @@ app.route('/api/v1/users', usersRoutes)
 app.route('/api/v1/relief-projects', reliefRoutes)
 app.route('/api/v1/incidents', incidentsRoutes)
 
-app.get('/', (c) => {
-  return c.render(<h1>CTG Command Center — booting…</h1>)
-})
+app.route('/', pagesRoutes)
 
 export default app
