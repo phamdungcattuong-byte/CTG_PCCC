@@ -686,6 +686,7 @@ function AppShell() {
       <script src="/static/assets/ctg-core.js"></script>
       <script src="/static/js/core-override.js"></script>
       <script src="/static/assets/chat-ai.js"></script>
+      <script src="/static/js/chat-ai-override.js"></script>
       <script src="/static/assets/ctg-modules.js"></script>
       <script src="/static/js/modules-override.js"></script>
       <script src="/static/assets/relief.js"></script>

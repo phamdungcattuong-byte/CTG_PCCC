@@ -177,6 +177,15 @@ Nếu câu hỏi liên quan quy định, luôn dẫn số Điều của QĐ.03 n
 
   function fallbackAI(q) {
     q = q.toLowerCase();
+    // eslint-disable-next-line
+    return fallbackAIImpl(q);
+  }
+  // Exposed on window so chat-ai-override.js can reuse the same canned
+  // responses as an offline/error fallback when the real AI backend
+  // (POST /api/v1/ai/chat) is unavailable.
+  window.__ctgFallbackAI = fallbackAI;
+
+  function fallbackAIImpl(q) {
     if (q.includes('cấp 10') || q.includes('6h')) {
       return `Trong 6h tới (T-6h), theo QĐ.03 Điều 30:<br>
 – <b>1)</b> Dừng toàn bộ thi công trên cao, di chuyển cẩu tháp về vị trí an toàn.<br>
@@ -221,7 +230,7 @@ Do diễn biến bão số 3 phức tạp, BCH yêu cầu:<br>
 – <b>3)</b> Đội PCCC cơ sở tiếp cận với bình MFZL4/CO₂, ngắt điện tổng.<br>
 Sau đó: kiểm điểm quân số, lập biên bản hiện trường, báo VPCT + Pháp chế.`;
     }
-    return `Tôi hiểu bạn cần thông tin về: "${q}". Trong prototype này tôi có bộ trả lời hạn chế. Hãy thử một câu hỏi trong gợi ý phía trên, hoặc kết nối API AI thật để nhận trả lời đầy đủ.`;
+    return `Tôi hiểu bạn cần thông tin về: "${q}". Dịch vụ AI hiện không phản hồi được nên tôi chỉ có bộ trả lời dự phòng hạn chế. Vui lòng thử lại sau ít phút, hoặc chọn một câu hỏi trong gợi ý phía trên.`;
   }
 
   window.openAI = function () {

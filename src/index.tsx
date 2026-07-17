@@ -9,6 +9,8 @@ import notificationsRoutes from './routes/notifications'
 import usersRoutes from './routes/users'
 import reliefRoutes from './routes/relief'
 import incidentsRoutes from './routes/incidents'
+import aiRoutes from './routes/ai'
+import camerasRoutes from './routes/cameras'
 import pagesRoutes from './routes/pages'
 
 const app = new Hono<AppEnv>()
@@ -23,6 +25,8 @@ app.route('/api/v1', notificationsRoutes)
 app.route('/api/v1/users', usersRoutes)
 app.route('/api/v1/relief-projects', reliefRoutes)
 app.route('/api/v1/incidents', incidentsRoutes)
+app.route('/api/v1/ai', aiRoutes)
+app.route('/api/v1/cameras', camerasRoutes)
 
 app.route('/', pagesRoutes)
 
