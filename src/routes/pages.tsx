@@ -689,6 +689,7 @@ function AppShell() {
       <script src="/static/assets/ctg-modules.js"></script>
       <script src="/static/js/modules-override.js"></script>
       <script src="/static/assets/relief.js"></script>
+      <script src="/static/js/relief-override.js"></script>
       <script src="/static/assets/admin.js"></script>
       <script src="/static/js/admin-override.js"></script>
       <script src="/static/js/bootstrap.js"></script>
