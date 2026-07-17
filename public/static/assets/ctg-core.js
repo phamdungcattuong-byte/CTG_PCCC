@@ -17,6 +17,7 @@
     process:    { t:'Quy trình & Pháp lý',               s:'QT-08 · căn cứ pháp lý · biểu mẫu' },
     log:        { t:'Nhật ký & Báo cáo',                 s:'Nhật ký sự kiện · AAR · xuất báo cáo' },
     relief:     { t:'Dự án cứu trợ',                     s:'Chuyến cứu trợ vùng thiên tai — kế hoạch, đội đi, ngân sách, hồ sơ' },
+    security:   { t:'An ninh Camera',                    s:'Live-feed camera an ninh · chung cư & công trường · cảnh báo' },
     admin:      { t:'Quản trị hệ thống',                 s:'Người dùng · vai trò · dữ liệu · cấu hình · audit log' },
   };
   window.SEC_TITLES = SEC_TITLES;

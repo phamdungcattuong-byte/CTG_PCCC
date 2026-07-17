@@ -123,6 +123,9 @@ function AppShell() {
           <button class="nav-btn" data-sec="relief" data-tip="Dự án cứu trợ">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.6a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.07a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
             Dự án cứu trợ</button>
+          <button class="nav-btn" data-sec="security" data-tip="An ninh Camera">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
+            An ninh Camera</button>
 
           <div class="nav-group">Hệ thống</div>
           <button class="nav-btn" data-sec="admin" data-tip="Quản trị hệ thống">
@@ -544,6 +547,10 @@ function AppShell() {
               <div id="reliefContent"></div>
             </section>
 
+            <section class="section" id="sec-security">
+              <div id="securityContent"></div>
+            </section>
+
             <section class="section" id="sec-admin">
               <div id="adminContent"></div>
             </section>
@@ -618,6 +625,20 @@ function AppShell() {
         <div class="modal"></div>
       </div>
 
+      <div class="modal-overlay" id="modal-cam-view">
+        <div class="modal modal-lg">
+          <div class="modal-h"><h3 id="camViewTitle">Camera</h3>
+            <button class="drawer-close right" onclick="window.closeModal('cam-view')">✕</button>
+          </div>
+          <div class="modal-b" id="camViewBody"></div>
+          <div class="modal-f">
+            <input id="camAlertMsg" placeholder="Nội dung cảnh báo an ninh (VD: Phát hiện người lạ khu vực cổng)" style="flex:1" />
+            <button class="btn btn-orange" id="camAlertBtn">🚨 Báo cảnh báo</button>
+            <button class="btn btn-ghost" onclick="window.closeModal('cam-view')">Đóng</button>
+          </div>
+        </div>
+      </div>
+
       <div class="modal-overlay" id="modal-incident">
         <div class="modal">
           <div class="modal-h"><h3 style="color:var(--crit)">⚠ Báo sự cố khẩn</h3>
@@ -689,10 +710,12 @@ function AppShell() {
       <script src="/static/js/chat-ai-override.js"></script>
       <script src="/static/assets/ctg-modules.js"></script>
       <script src="/static/js/modules-override.js"></script>
+      <script src="/static/js/security-camera.js"></script>
       <script src="/static/assets/relief.js"></script>
       <script src="/static/js/relief-override.js"></script>
       <script src="/static/assets/admin.js"></script>
       <script src="/static/js/admin-override.js"></script>
+      <script src="/static/js/camera-admin.js"></script>
       <script src="/static/js/bootstrap.js"></script>
     </>
   )

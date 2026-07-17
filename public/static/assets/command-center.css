@@ -1129,6 +1129,7 @@ body.drill .app { padding-top: 0; }
   animation: modal-in .25s ease;
 }
 @keyframes modal-in { from { opacity: 0; transform: translateY(20px) scale(.98); } to { opacity: 1; transform: none; } }
+.modal-lg { max-width: 900px; }
 .modal-h {
   padding: 14px 18px;
   border-bottom: 1px solid var(--line);

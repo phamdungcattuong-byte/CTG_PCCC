@@ -64,6 +64,7 @@
     { k: 'tasklib',   l: 'Nhiệm vụ mẫu',     icon: '📋' },
     { k: 'scenarios', l: 'Kịch bản',         icon: '🎯' },
     { k: 'norms',     l: 'Định mức',         icon: '📦' },
+    { k: 'cameras',   l: 'Camera',           icon: '📷' },
     { k: 'config',    l: 'Cấu hình',         icon: '⚙️' },
     { k: 'audit',     l: 'Audit Log',        icon: '📜' },
   ];
@@ -125,6 +126,7 @@
       tasklib: renderTaskLib,
       scenarios: renderScenariosAdmin,
       norms: renderNorms,
+      cameras: window.renderCameraAdmin || function (el) { el.innerHTML = '<div class="muted small">Đang tải...</div>'; },
       config: renderConfig,
       audit: renderAudit,
     };
@@ -682,8 +684,12 @@
               <div class="flex"><input type="password" value="sms_••••••••••••" style="flex:1"><span class="badge bg-good">● OK</span></div></div>
             <div><label class="small b" style="color:var(--ink-2)">Email SMTP</label>
               <div class="flex"><input value="smtp.cattuong.com.vn:587" style="flex:1"><span class="badge bg-good">● OK</span></div></div>
-            <div><label class="small b" style="color:var(--ink-2)">Camera Stream URL</label>
-              <div class="flex"><input value="rtsp://camera.cattuong.local:554" style="flex:1"><span class="badge bg-good">4 cam</span></div></div>
+            <div><label class="small b" style="color:var(--ink-2)">Trợ lý AI (LLM)</label>
+              <div class="flex"><input value="gpt-5-mini via Genspark LLM proxy" style="flex:1" disabled><span class="badge bg-good">● OK</span></div></div>
+            <div class="alert-box ab-info" style="margin-top:2px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z"/></svg>
+              <div class="tiny">Quản lý camera an ninh (URL luồng HLS/Embed theo từng camera) đã chuyển sang tab <b>📷 Camera</b> ở menu bên trái — không còn cấu hình 1 URL chung ở đây nữa.</div>
+            </div>
           </div>
         </div>
 
