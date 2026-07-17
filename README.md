@@ -61,11 +61,11 @@ GitHub chưa được kết nối cho project này (`setup_github_environment` b
 - [x] Set secret `JWT_SECRET` cho production (secret riêng, khác với `.dev.vars` dùng lúc dev).
 - [x] Verify toàn luồng trên production: login → activate (sinh 28 task) → ack → done → deactivate → notifications → relief-projects → users (kiểm tra RBAC theo từng role).
 - [x] Sửa bug `active` dropdown trong admin-override.js (trước đó luôn lưu giá trị `1` bất kể lựa chọn).
+- [x] Sửa route `POST /users` để lưu đúng cột `active` khi tạo user mới (trước đó luôn bỏ qua giá trị client gửi lên, mặc định DB = 1) — đã test 3 case (active:false/true/omit) trên sandbox và production, đã redeploy.
 
 ## Việc chưa hoàn thành / Cần làm tiếp
 - [ ] **Push code lên GitHub** — đang chờ user hoàn tất authorization ở tab #github.
 - [ ] **Test UI qua browser thật** (click-through) — mới verify qua API call trực tiếp (chính là API mà UI gọi), chưa test bằng cách bấm nút trên trình duyệt thật (Playwright Python thiếu system dependencies trong sandbox này để chạy headless Chromium).
-- [ ] Route `POST /users` (tạo user mới) chưa lưu cột `active` khi insert (chỉ PATCH mới cập nhật được) — cần bổ sung.
 - [ ] Cân nhắc thêm `Idempotency-Key` cho `confirmActivate` để chống double-click kích hoạt trùng.
 - [ ] Đổi mật khẩu mặc định `Cattuong@2026` cho 24 tài khoản trước khi đưa vào vận hành thật.
 - [ ] Rate-limiting cho login (Cloudflare Workers không có in-memory limiter sẵn — cần bộ đếm D1/KV, đã ghi chú TODO trong code, chưa triển khai — Phase 2).
@@ -76,4 +76,4 @@ GitHub chưa được kết nối cho project này (`setup_github_environment` b
 - **Platform**: Cloudflare Workers (Genspark Hosted Deploy — Workers for Platform, tài khoản Cloudflare do Genspark quản lý)
 - **Trạng thái**: ✅ Đang hoạt động (Active) — deploy lần đầu thành công
 - **Tech stack**: Hono + TypeScript + Cloudflare D1/R2 + Vite + Wrangler
-- **Cập nhật lần cuối**: 2026-07-17
+- **Cập nhật lần cuối**: 2026-07-17 (redeploy sau fix `POST /users` active column)
