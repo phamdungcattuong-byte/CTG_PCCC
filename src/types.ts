@@ -29,4 +29,5 @@ export interface AuthUser {
   roleId: string
   online: boolean
   permissions: string[]
+  mustChangePassword?: boolean
 }

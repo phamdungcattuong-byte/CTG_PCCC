@@ -7,6 +7,7 @@ export const renderer = jsxRenderer(({ children }) => {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <title>CTG Command Center — PCLB · PCCC · Cát Tường Group</title>
+        <link href="/static/favicon.svg" rel="icon" type="image/svg+xml" />
         <link href="/static/assets/command-center.css" rel="stylesheet" />
         <link href="/static/style.css" rel="stylesheet" />
       </head>

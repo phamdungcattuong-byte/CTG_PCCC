@@ -16,6 +16,66 @@
     window.setScenario('norm');
   };
 
+  // Blocking modal shown when the logged-in account has must_change_password
+  // set (all 24 seeded accounts share the same default password, so this
+  // forces every one of them off it on first login). Reuses the login card
+  // visual style; injected into <body> since the app shell markup hasn't
+  // rendered app content behind an unmet gate.
+  function showForceChangePasswordModal(me) {
+    return new Promise(function (resolve) {
+      var overlay = document.createElement('div');
+      overlay.className = 'login-page';
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.zIndex = '9999';
+      overlay.innerHTML =
+        '<div class="login-card card">' +
+        '  <h1 class="login-title">Đổi mật khẩu bắt buộc</h1>' +
+        '  <p class="muted small login-sub">Tài khoản của bạn đang dùng mật khẩu mặc định. Vui lòng đặt mật khẩu mới trước khi tiếp tục.</p>' +
+        '  <form id="fcpForm" class="login-form" autocomplete="off">' +
+        '    <label class="small b login-label">Mật khẩu hiện tại</label>' +
+        '    <input id="fcpCurrent" type="password" autocomplete="current-password" required />' +
+        '    <label class="small b login-label">Mật khẩu mới (tối thiểu 8 ký tự)</label>' +
+        '    <input id="fcpNew" type="password" autocomplete="new-password" minlength="8" required />' +
+        '    <label class="small b login-label">Nhập lại mật khẩu mới</label>' +
+        '    <input id="fcpConfirm" type="password" autocomplete="new-password" minlength="8" required />' +
+        '    <div id="fcpError" class="alert-box ab-crit login-error" style="display:none"></div>' +
+        '    <button type="submit" class="btn btn-primary btn-lg login-submit" id="fcpSubmit">Đổi mật khẩu</button>' +
+        '  </form>' +
+        '</div>';
+      document.body.appendChild(overlay);
+
+      var form = overlay.querySelector('#fcpForm');
+      var errBox = overlay.querySelector('#fcpError');
+      var submitBtn = overlay.querySelector('#fcpSubmit');
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        errBox.style.display = 'none';
+        var current = overlay.querySelector('#fcpCurrent').value;
+        var next = overlay.querySelector('#fcpNew').value;
+        var confirm = overlay.querySelector('#fcpConfirm').value;
+        if (next !== confirm) {
+          errBox.textContent = 'Mật khẩu mới nhập lại không khớp';
+          errBox.style.display = '';
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Đang xử lý…';
+        try {
+          await window.API.post('/auth/change-password', { currentPassword: current, newPassword: next });
+          document.body.removeChild(overlay);
+          resolve();
+        } catch (err) {
+          errBox.textContent = err.message || 'Không thể đổi mật khẩu';
+          errBox.style.display = '';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Đổi mật khẩu';
+        }
+      });
+    });
+  }
+
   async function boot() {
     var me;
     try {
@@ -41,6 +101,11 @@
       // Not authenticated — should not normally happen since / redirects to /login.
       window.location.href = '/login';
       return;
+    }
+
+    if (me.mustChangePassword) {
+      await showForceChangePasswordModal(me);
+      me.mustChangePassword = false;
     }
 
     // Run the original prototype boot sequence. initCore() calls

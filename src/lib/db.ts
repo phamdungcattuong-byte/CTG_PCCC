@@ -22,6 +22,7 @@ export interface UserRow {
   active: number
   deleted_at: string | null
   last_login_at: string | null
+  must_change_password: number
 }
 
 export interface RoleRow {
@@ -83,6 +84,7 @@ export async function toAuthUser(db: D1Database, u: UserRow): Promise<AuthUser> 
     roleId: u.role_id,
     online: !!u.online,
     permissions,
+    mustChangePassword: !!u.must_change_password,
   }
 }
 
@@ -95,6 +97,60 @@ export async function touchLastLogin(db: D1Database, userId: string): Promise<vo
 
 export async function markUserOffline(db: D1Database, userId: string): Promise<void> {
   await db.prepare('UPDATE users SET online = 0 WHERE id = ?').bind(userId).run()
+}
+
+export async function setMustChangePassword(db: D1Database, userId: string, value: boolean): Promise<void> {
+  await db.prepare('UPDATE users SET must_change_password = ? WHERE id = ?').bind(value ? 1 : 0, userId).run()
+}
+
+// ---------------------------------------------------------------------------
+// Login rate-limiting — sliding window over the `login_attempts` table.
+// No Cloudflare in-memory limiter is available on Workers, so this uses D1
+// as the counter store. Two independent limits are enforced by the caller:
+// per-username and per-IP, both over the same WINDOW_MINUTES lookback.
+// ---------------------------------------------------------------------------
+export const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5
+export const LOGIN_RATE_LIMIT_WINDOW_MINUTES = 1
+
+export async function recordLoginAttempt(
+  db: D1Database,
+  entry: { id: string; username: string; ip: string | null; success: boolean }
+): Promise<void> {
+  await db
+    .prepare(`INSERT INTO login_attempts (id, username, ip, success) VALUES (?, ?, ?, ?)`)
+    .bind(entry.id, entry.username, entry.ip, entry.success ? 1 : 0)
+    .run()
+}
+
+// Returns true if the caller (by username OR by ip) has too many recent
+// FAILED attempts and should be blocked. Successful logins don't count
+// against the limit (only consecutive failures do).
+export async function isLoginRateLimited(
+  db: D1Database,
+  username: string,
+  ip: string | null
+): Promise<boolean> {
+  const windowStart = `-${LOGIN_RATE_LIMIT_WINDOW_MINUTES} minutes`
+  const byUsername = await db
+    .prepare(
+      `SELECT COUNT(*) c FROM login_attempts
+       WHERE username = ? AND success = 0 AND created_at > datetime('now', ?)`
+    )
+    .bind(username, windowStart)
+    .first<{ c: number }>()
+  if ((byUsername?.c ?? 0) >= LOGIN_RATE_LIMIT_MAX_ATTEMPTS) return true
+
+  if (ip) {
+    const byIp = await db
+      .prepare(
+        `SELECT COUNT(*) c FROM login_attempts
+         WHERE ip = ? AND success = 0 AND created_at > datetime('now', ?)`
+      )
+      .bind(ip, windowStart)
+      .first<{ c: number }>()
+    if ((byIp?.c ?? 0) >= LOGIN_RATE_LIMIT_MAX_ATTEMPTS) return true
+  }
+  return false
 }
 
 export async function insertAuditLog(
