@@ -40,6 +40,7 @@
 | GET | `/audit`, `/audit/export` | Nhật ký kiểm toán |
 | GET/POST/PATCH/DELETE | `/users` | Quản trị người dùng (yêu cầu quyền `admin.manage` cho POST/PATCH/DELETE) |
 | GET/POST/PATCH | `/relief-projects` | Dự án cứu trợ (team/vehicles/cargo/itinerary/tasks/approvals) |
+| POST | `/auth/change-password` | Đổi mật khẩu (tự phục vụ, yêu cầu mustChangePassword hiện tại) |
 
 Envelope phản hồi thống nhất: `{ok:true, data}` hoặc `{ok:false, error:{code,message}}`.
 
@@ -50,8 +51,13 @@ Envelope phản hồi thống nhất: `{ok:true, data}` hoặc `{ok:false, error
 4. Vai trò `admin`/`super` vào mục Quản trị để quản lý người dùng, xem nhật ký kiểm toán.
 5. Vai trò `relief` quản lý các dự án cứu trợ (ngân sách, đội, phương tiện, hàng hoá, lịch trình).
 
+## Bảo mật đăng nhập
+- **Rate-limiting**: tối đa 5 lần đăng nhập sai / phút, tính theo cả **username** và **IP** (D1-backed sliding window, không dùng KV/memory vì Cloudflare Workers không có in-memory limiter). Vượt ngưỡng → HTTP 429 `RATE_LIMITED`.
+- **Buộc đổi mật khẩu lần đầu**: toàn bộ 24 tài khoản seed có cờ `must_change_password = 1`. Khi đăng nhập, nếu cờ này = true, app shell hiển thị modal chặn buộc đổi mật khẩu trước khi vào hệ thống (`bootstrap.js` → `showForceChangePasswordModal`). Gọi `POST /auth/change-password` với mật khẩu hiện tại đúng + mật khẩu mới (≥ 8 ký tự, khác mật khẩu cũ) sẽ tự xóa cờ này.
+- Migration: `migrations/0005_security_hardening.sql` (thêm cột `must_change_password` vào `users`, bảng `login_attempts`).
+
 ## Trạng thái GitHub
-GitHub chưa được kết nối cho project này (`setup_github_environment` báo "No GitHub session state found"). Cần vào tab **#github** trong Genspark để hoàn tất authorization, sau đó agent sẽ push code lên repository.
+GitHub chưa được kết nối cho project này (`setup_github_environment` đã thử 6 lần, luôn báo "No GitHub session state found"). Cần vào tab **#github** trong Genspark để hoàn tất authorization, sau đó agent sẽ push code lên repository.
 
 ## Việc đã hoàn thành
 - [x] Toàn bộ backend API (auth, events/tasks, notifications, users, relief-projects, incidents) — đã test end-to-end qua curl trên cả sandbox và **production thật**.
@@ -62,18 +68,19 @@ GitHub chưa được kết nối cho project này (`setup_github_environment` b
 - [x] Verify toàn luồng trên production: login → activate (sinh 28 task) → ack → done → deactivate → notifications → relief-projects → users (kiểm tra RBAC theo từng role).
 - [x] Sửa bug `active` dropdown trong admin-override.js (trước đó luôn lưu giá trị `1` bất kể lựa chọn).
 - [x] Sửa route `POST /users` để lưu đúng cột `active` khi tạo user mới (trước đó luôn bỏ qua giá trị client gửi lên, mặc định DB = 1) — đã test 3 case (active:false/true/omit) trên sandbox và production, đã redeploy.
+- [x] Rate-limiting cho login (5 lần sai/phút theo username+IP, D1-backed) — test 6 lần đăng nhập sai trên cả sandbox và production, xác nhận HTTP 429 ở lần thứ 6.
+- [x] Buộc đổi mật khẩu lần đầu cho 24 tài khoản seed (cờ `must_change_password`) + endpoint `POST /auth/change-password` + modal chặn UI — test toàn bộ round-trip (login → modal → đổi → cờ về false) trên production.
+- [x] Thêm `favicon.svg` (khắc phục 404 trước đó), áp dụng cho cả trang `/login` và app shell qua `renderer.tsx`.
 
 ## Việc chưa hoàn thành / Cần làm tiếp
-- [ ] **Push code lên GitHub** — đang chờ user hoàn tất authorization ở tab #github.
+- [ ] **Push code lên GitHub** — đã thử `setup_github_environment` 6 lần, vẫn báo chưa có session GitHub. Cần user hoàn tất authorization ở tab #github.
 - [ ] **Test UI qua browser thật** (click-through) — mới verify qua API call trực tiếp (chính là API mà UI gọi), chưa test bằng cách bấm nút trên trình duyệt thật (Playwright Python thiếu system dependencies trong sandbox này để chạy headless Chromium).
 - [ ] Cân nhắc thêm `Idempotency-Key` cho `confirmActivate` để chống double-click kích hoạt trùng.
-- [ ] Đổi mật khẩu mặc định `Cattuong@2026` cho 24 tài khoản trước khi đưa vào vận hành thật.
-- [ ] Rate-limiting cho login (Cloudflare Workers không có in-memory limiter sẵn — cần bộ đếm D1/KV, đã ghi chú TODO trong code, chưa triển khai — Phase 2).
-- [ ] Bổ sung `favicon.ico` (hiện 404, không ảnh hưởng chức năng).
+- [ ] Đổi mật khẩu thật cho 24 tài khoản — cờ `must_change_password` đã bắt buộc điều này ngay lần đăng nhập đầu tiên của mọi người dùng thật, nhưng admin nên chủ động nhắc người dùng thực hiện.
 - [ ] 2FA — đã có field trong schema nhưng chưa triển khai endpoint (deferred theo API-CONTRACT).
 
 ## Triển khai
 - **Platform**: Cloudflare Workers (Genspark Hosted Deploy — Workers for Platform, tài khoản Cloudflare do Genspark quản lý)
 - **Trạng thái**: ✅ Đang hoạt động (Active) — deploy lần đầu thành công
 - **Tech stack**: Hono + TypeScript + Cloudflare D1/R2 + Vite + Wrangler
-- **Cập nhật lần cuối**: 2026-07-17 (redeploy sau fix `POST /users` active column)
+- **Cập nhật lần cuối**: 2026-07-17 (redeploy sau security hardening: rate-limiting + forced password change + favicon)
