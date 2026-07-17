@@ -92,4 +92,20 @@
       console.error(e);
     }
   };
+
+  // Admin safety-net: turn off 2FA + clear the secret on the target account
+  // (e.g. staff lost their authenticator device and is locked out of login).
+  // Backend: POST /users/:id/2fa/reset, requires admin.manage.
+  window.resetUser2fa = async function (id) {
+    const p = window.PEOPLE.find((x) => x.id === id);
+    if (!p) return;
+    if (!confirm('Đặt lại (tắt) 2FA cho "' + p.name + '"? Người dùng sẽ đăng nhập lại chỉ bằng mật khẩu và cần thiết lập 2FA mới nếu muốn dùng lại.')) return;
+    try {
+      await window.API.post('/users/' + id + '/2fa/reset', {});
+      window.toast('🔐 Đã đặt lại 2FA cho <b>' + p.name + '</b>', 'warn');
+    } catch (e) {
+      window.toast('Lỗi đặt lại 2FA: ' + (e.message || ''), 'crit');
+      console.error(e);
+    }
+  };
 })();

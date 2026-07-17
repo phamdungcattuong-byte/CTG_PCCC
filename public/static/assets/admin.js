@@ -271,6 +271,7 @@
         <td>${p.online?'<span class="badge bg-good">● Online</span>':'<span class="badge bg-navy">○ Offline</span>'}</td>
         <td class="flex" style="gap:4px">
           <button class="btn btn-ghost btn-sm" onclick="window.openUserForm('${p.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" title="Đặt lại (tắt) 2FA nếu mất thiết bị xác thực" onclick="window.resetUser2fa && window.resetUser2fa('${p.id}')">🔐</button>
           <button class="btn btn-ghost btn-sm" onclick="window.deleteUser('${p.id}')">🗑</button>
         </td>
       </tr>`;

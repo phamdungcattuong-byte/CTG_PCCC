@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { newUuid, hashPassword, randomSaltBase64 } from '../lib/crypto'
-import { insertAuditLog } from '../lib/db'
+import { insertAuditLog, setTwoFactorEnabled, setTwoFactorSecret } from '../lib/db'
 
 const users = new Hono<AppEnv>()
 
@@ -134,6 +134,22 @@ users.delete('/:id', requirePermission('admin.manage'), async (c) => {
   await c.env.DB.prepare(`UPDATE users SET deleted_at = datetime('now'), active = 0 WHERE id = ?`).bind(id).run()
   await insertAuditLog(c.env.DB, { id: newUuid(), actorId: c.var.user!.id, action: 'delete', objectType: 'user', objectId: id, objectLabel: existing.name, detail: 'Xoá (soft-delete) người dùng' })
   return c.body(null, 204)
+})
+
+// POST /users/:id/2fa/reset  -> { ok }  (admin.manage only)
+// Turns off 2FA on the target account and clears its secret — for when a
+// staff member loses their authenticator device and is locked out of login.
+users.post('/:id/2fa/reset', requirePermission('admin.manage'), async (c) => {
+  const id = c.req.param('id')
+  const existing: any = await c.env.DB.prepare('SELECT * FROM users WHERE id = ? AND deleted_at IS NULL').bind(id).first()
+  if (!existing) return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Không tìm thấy người dùng' } }, 404)
+  await setTwoFactorEnabled(c.env.DB, id, false)
+  await setTwoFactorSecret(c.env.DB, id, null)
+  await insertAuditLog(c.env.DB, {
+    id: newUuid(), actorId: c.var.user!.id, action: 'update', objectType: 'user', objectId: id,
+    objectLabel: existing.name, detail: 'Quản trị viên đặt lại (tắt) 2FA do người dùng mất thiết bị xác thực',
+  })
+  return c.json({ ok: true, data: { ok: true } })
 })
 
 export default users

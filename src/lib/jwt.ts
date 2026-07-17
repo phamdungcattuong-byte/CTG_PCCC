@@ -51,3 +51,30 @@ export function refreshTokenExpiryIso(): string {
 
 export const ACCESS_TOKEN_TTL = ACCESS_TOKEN_TTL_SECONDS
 export const REFRESH_TOKEN_TTL = REFRESH_TOKEN_TTL_SECONDS
+
+// Short-lived token issued after a correct password but pending 2FA code
+// verification (login not yet complete — no session cookie set for this).
+const PENDING_2FA_TTL_SECONDS = 5 * 60 // 5 minutes
+
+export interface Pending2faPayload {
+  sub: string // user id
+  typ: '2fa_pending'
+  iat: number
+  exp: number
+}
+
+export async function signPending2faToken(userId: string, secret: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const payload: Pending2faPayload = { sub: userId, typ: '2fa_pending', iat: now, exp: now + PENDING_2FA_TTL_SECONDS }
+  return Jwt.sign(payload as unknown as Record<string, unknown>, secret, 'HS256')
+}
+
+export async function verifyPending2faToken(token: string, secret: string): Promise<Pending2faPayload | null> {
+  try {
+    const payload = (await Jwt.verify(token, secret, 'HS256')) as unknown as Pending2faPayload
+    if (payload.typ !== '2fa_pending') return null
+    return payload
+  } catch {
+    return null
+  }
+}

@@ -46,11 +46,23 @@ pages.get('/login', (c) => {
           <button type="submit" class="btn btn-primary btn-lg login-submit" id="loginSubmit">Đăng nhập</button>
         </form>
 
+        <form id="login2faForm" class="login-form" autocomplete="off" style="display:none">
+          <label class="small b login-label">Mã xác thực 2FA</label>
+          <p class="muted small login-sub" style="margin:0 0 8px">Mở ứng dụng xác thực trên điện thoại và nhập mã 6 số hiện tại.</p>
+          <input id="login2faCode" name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" autocomplete="one-time-code" required style="text-align:center;font-size:22px;letter-spacing:.3em" />
+
+          <div id="login2faError" class="alert-box ab-crit login-error" style="display:none"></div>
+
+          <button type="submit" class="btn btn-primary btn-lg login-submit" id="login2faSubmit">Xác nhận</button>
+          <button type="button" class="btn btn-ghost btn-lg" id="login2faBack">← Quay lại đăng nhập</button>
+        </form>
+
         <div class="login-foot muted tiny">
           Phiên bản 2.2 · 07/2026 · Mã: PCLB-PCCC-CC-02<br />
           Căn cứ: QĐ.03 (17/07/2026)
         </div>
       </div>
+      <script src="/static/js/api-client.js"></script>
       <script src="/static/js/login.js"></script>
     </div>
   )
@@ -437,6 +449,20 @@ function AppShell() {
                   </div>
                 </div>
               </div>
+
+              <div class="card mt">
+                <div class="card-h"><h3>🔒 Bảo mật tài khoản</h3></div>
+                <div class="card-b">
+                  <div class="flex" style="justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+                    <div>
+                      <div class="b">Xác thực 2 lớp (2FA)</div>
+                      <div class="muted small">Yêu cầu mã 6 số từ ứng dụng xác thực (Google Authenticator, Authy…) mỗi lần đăng nhập, ngoài mật khẩu.</div>
+                      <div class="muted small mt8">Trạng thái: <span class="badge" id="twoFaStatusBadge">—</span></div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="twoFaActionBtn" onclick="window.open2faModal()">Thiết lập 2FA</button>
+                  </div>
+                </div>
+              </div>
             </section>
 
             <section class="section" id="sec-pccc">
@@ -639,6 +665,15 @@ function AppShell() {
         </div>
       </div>
 
+      <div class="modal-overlay" id="modal-2fa">
+        <div class="modal">
+          <div class="modal-h"><h3 id="twoFaModalTitle">Thiết lập xác thực 2 lớp</h3>
+            <button class="drawer-close right" onclick="window.closeModal('2fa')">✕</button>
+          </div>
+          <div class="modal-b" id="twoFaModalBody"></div>
+        </div>
+      </div>
+
       <div class="modal-overlay" id="modal-incident">
         <div class="modal">
           <div class="modal-h"><h3 style="color:var(--crit)">⚠ Báo sự cố khẩn</h3>
@@ -716,6 +751,7 @@ function AppShell() {
       <script src="/static/assets/admin.js"></script>
       <script src="/static/js/admin-override.js"></script>
       <script src="/static/js/camera-admin.js"></script>
+      <script src="/static/js/twofa.js"></script>
       <script src="/static/js/bootstrap.js"></script>
     </>
   )

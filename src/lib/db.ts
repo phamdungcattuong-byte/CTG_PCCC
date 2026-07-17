@@ -23,6 +23,8 @@ export interface UserRow {
   deleted_at: string | null
   last_login_at: string | null
   must_change_password: number
+  two_factor_secret: string | null
+  two_factor_enabled: number
 }
 
 export interface RoleRow {
@@ -85,7 +87,22 @@ export async function toAuthUser(db: D1Database, u: UserRow): Promise<AuthUser> 
     online: !!u.online,
     permissions,
     mustChangePassword: !!u.must_change_password,
+    twoFactorEnabled: !!u.two_factor_enabled,
   }
+}
+
+export async function setTwoFactorSecret(db: D1Database, userId: string, secretBase32: string | null): Promise<void> {
+  await db
+    .prepare("UPDATE users SET two_factor_secret = ?, updated_at = datetime('now') WHERE id = ?")
+    .bind(secretBase32, userId)
+    .run()
+}
+
+export async function setTwoFactorEnabled(db: D1Database, userId: string, enabled: boolean): Promise<void> {
+  await db
+    .prepare("UPDATE users SET two_factor_enabled = ?, updated_at = datetime('now') WHERE id = ?")
+    .bind(enabled ? 1 : 0, userId)
+    .run()
 }
 
 export async function touchLastLogin(db: D1Database, userId: string): Promise<void> {

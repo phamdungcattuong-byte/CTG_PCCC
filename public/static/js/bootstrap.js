@@ -146,6 +146,22 @@
       }
       if (window.refreshNotifs) window.refreshNotifs();
     }, 15000);
+
+    // Dedicated faster poll (5s) for the "An ninh Camera" section only — camera
+    // status/open-alerts are more time-sensitive than the general 15s sweep
+    // above, and only fires while that section is actually the visible one
+    // (avoids extra API calls when the user is elsewhere in the app). Also
+    // skipped while the camera fullscreen viewer modal is open, so it doesn't
+    // fight with the live HLS player / in-progress alert form.
+    setInterval(function () {
+      if (document.hidden) return;
+      var sec = document.querySelector('.section.active')?.id?.replace('sec-', '');
+      if (sec !== 'security') return;
+      if (document.querySelector('#modal-cam-view.open')) return;
+      if (window.MODULE_HOOKS && window.MODULE_HOOKS.security) {
+        try { window.MODULE_HOOKS.security(); } catch (e) { console.warn(e); }
+      }
+    }, 5000);
   }
 
   document.addEventListener('DOMContentLoaded', boot);

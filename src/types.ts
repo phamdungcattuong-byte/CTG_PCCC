@@ -32,4 +32,5 @@ export interface AuthUser {
   online: boolean
   permissions: string[]
   mustChangePassword?: boolean
+  twoFactorEnabled?: boolean
 }

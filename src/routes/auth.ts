@@ -10,10 +10,15 @@ import { verifyPassword, hashPassword, newUuid } from '../lib/crypto'
 import {
   findUserByUsername, findUserById, toAuthUser, touchLastLogin, markUserOffline, insertAuditLog,
   isLoginRateLimited, recordLoginAttempt, setMustChangePassword,
+  setTwoFactorSecret, setTwoFactorEnabled,
   LOGIN_RATE_LIMIT_MAX_ATTEMPTS, LOGIN_RATE_LIMIT_WINDOW_MINUTES,
 } from '../lib/db'
-import { signAccessToken, newRefreshTokenPlain, hashRefreshToken, refreshTokenExpiryIso } from '../lib/jwt'
+import {
+  signAccessToken, newRefreshTokenPlain, hashRefreshToken, refreshTokenExpiryIso,
+  signPending2faToken, verifyPending2faToken,
+} from '../lib/jwt'
 import { ACCESS_COOKIE_NAME, requireAuth } from '../middleware/auth'
+import { randomBase32Secret, verifyTotp, buildOtpAuthUrl } from '../lib/totp'
 
 const auth = new Hono<AppEnv>()
 
@@ -27,6 +32,42 @@ function cookieOpts(maxAgeSeconds: number) {
     path: '/',
     maxAge: maxAgeSeconds,
   }
+}
+
+// Shared "finish login" step — issues access+refresh tokens, sets cookies,
+// touches last_login_at, writes the audit log. Used by both the normal
+// (no 2FA) login path and the 2FA login-verify path so the two stay
+// perfectly in sync.
+async function completeLogin(c: any, userRow: { id: string; username: string; role_id: string }) {
+  const accessToken = await signAccessToken(userRow.id, userRow.username, userRow.role_id, c.env.JWT_SECRET)
+
+  const refreshPlain = newRefreshTokenPlain()
+  const refreshHash = await hashRefreshToken(refreshPlain)
+  await c.env.DB
+    .prepare(
+      `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, user_agent, ip)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .bind(newUuid(), userRow.id, refreshHash, refreshTokenExpiryIso(), c.req.header('User-Agent') ?? null, c.req.header('CF-Connecting-IP') ?? null)
+    .run()
+
+  await touchLastLogin(c.env.DB, userRow.id)
+  await insertAuditLog(c.env.DB, {
+    id: newUuid(),
+    actorId: userRow.id,
+    action: 'login',
+    objectLabel: 'Hệ thống',
+    detail: `Đăng nhập từ IP ${c.req.header('CF-Connecting-IP') ?? 'unknown'}`,
+    ip: c.req.header('CF-Connecting-IP') ?? null,
+    userAgent: c.req.header('User-Agent') ?? null,
+  })
+
+  setCookie(c, ACCESS_COOKIE_NAME, accessToken, cookieOpts(15 * 60))
+  setCookie(c, REFRESH_COOKIE_NAME, refreshPlain, cookieOpts(30 * 24 * 3600))
+
+  const fullUserRow = await findUserById(c.env.DB, userRow.id)
+  const authUser = await toAuthUser(c.env.DB, fullUserRow!)
+  return { token: accessToken, user: authUser }
 }
 
 // POST /api/v1/auth/login  { username, password } -> { token, user }
@@ -65,34 +106,45 @@ auth.post('/login', async (c) => {
   }
   await recordLoginAttempt(c.env.DB, { id: newUuid(), username, ip, success: true })
 
-  const accessToken = await signAccessToken(userRow.id, userRow.username, userRow.role_id, c.env.JWT_SECRET)
+  // If 2FA is enabled on this account, password alone is not enough — issue
+  // a short-lived pending token (no session cookie yet) and require the
+  // client to call /auth/2fa/login-verify with a TOTP code to finish login.
+  if (userRow.two_factor_enabled && userRow.two_factor_secret) {
+    const pendingToken = await signPending2faToken(userRow.id, c.env.JWT_SECRET)
+    return c.json({ ok: true, data: { twoFactorRequired: true, pendingToken } })
+  }
 
-  const refreshPlain = newRefreshTokenPlain()
-  const refreshHash = await hashRefreshToken(refreshPlain)
-  await c.env.DB
-    .prepare(
-      `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, user_agent, ip)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .bind(newUuid(), userRow.id, refreshHash, refreshTokenExpiryIso(), c.req.header('User-Agent') ?? null, c.req.header('CF-Connecting-IP') ?? null)
-    .run()
+  const data = await completeLogin(c, userRow)
+  return c.json({ ok: true, data })
+})
 
-  await touchLastLogin(c.env.DB, userRow.id)
-  await insertAuditLog(c.env.DB, {
-    id: newUuid(),
-    actorId: userRow.id,
-    action: 'login',
-    objectLabel: 'Hệ thống',
-    detail: `Đăng nhập từ IP ${c.req.header('CF-Connecting-IP') ?? 'unknown'}`,
-    ip: c.req.header('CF-Connecting-IP') ?? null,
-    userAgent: c.req.header('User-Agent') ?? null,
-  })
+// POST /api/v1/auth/2fa/login-verify  { pendingToken, code } -> { token, user }
+// Second step of login when the account has 2FA enabled. pendingToken comes
+// from the twoFactorRequired response of /auth/login (5-minute validity).
+auth.post('/2fa/login-verify', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  if (!body || typeof body.pendingToken !== 'string' || typeof body.code !== 'string') {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu pendingToken hoặc code' } }, 400)
+  }
+  const pending = await verifyPending2faToken(body.pendingToken, c.env.JWT_SECRET)
+  if (!pending) {
+    return c.json({ ok: false, error: { code: 'UNAUTHENTICATED', message: 'pendingToken không hợp lệ hoặc đã hết hạn, vui lòng đăng nhập lại' } }, 401)
+  }
+  const userRow = await findUserById(c.env.DB, pending.sub)
+  if (!userRow || !userRow.active || !userRow.two_factor_enabled || !userRow.two_factor_secret) {
+    return c.json({ ok: false, error: { code: 'UNAUTHENTICATED', message: 'Tài khoản không hợp lệ' } }, 401)
+  }
+  const ok = await verifyTotp(userRow.two_factor_secret, body.code)
+  if (!ok) {
+    await insertAuditLog(c.env.DB, {
+      id: newUuid(), actorId: userRow.id, action: 'login', objectLabel: 'Hệ thống',
+      detail: 'Nhập sai mã 2FA khi đăng nhập', ip: c.req.header('CF-Connecting-IP') ?? null, userAgent: c.req.header('User-Agent') ?? null,
+    })
+    return c.json({ ok: false, error: { code: 'INVALID_2FA_CODE', message: 'Mã xác thực 2FA không đúng' } }, 401)
+  }
 
-  setCookie(c, ACCESS_COOKIE_NAME, accessToken, cookieOpts(15 * 60))
-  setCookie(c, REFRESH_COOKIE_NAME, refreshPlain, cookieOpts(30 * 24 * 3600))
-
-  const authUser = await toAuthUser(c.env.DB, userRow)
-  return c.json({ ok: true, data: { token: accessToken, user: authUser } })
+  const data = await completeLogin(c, userRow)
+  return c.json({ ok: true, data })
 })
 
 // POST /api/v1/auth/logout
@@ -186,6 +238,89 @@ auth.post('/change-password', requireAuth, async (c) => {
   })
 
   return c.json({ ok: true, data: { ok: true } })
+})
+
+// ---------------------------------------------------------------------------
+// 2FA self-service (TOTP) — was deferred in Phase 1 per docs/API-CONTRACT.md
+// §1 note; the `two_factor_secret`/`two_factor_enabled` columns already
+// existed on `users` (migrations/0002) with no endpoint. Implemented here
+// using Web Crypto HMAC-SHA1 (see ../lib/totp) since Cloudflare Workers has
+// no Node `crypto`/`Buffer` for a standard npm TOTP package.
+//
+// Flow: POST /2fa/setup (generates + stores a NEW secret, disabled until
+// confirmed) -> user scans QR / enters secret in an authenticator app ->
+// POST /2fa/confirm { code } (verifies once, flips two_factor_enabled=1)
+// -> POST /2fa/disable { code } (requires a valid current code to turn off).
+// ---------------------------------------------------------------------------
+
+// POST /api/v1/auth/2fa/setup -> { secret, otpauthUrl }
+// Requires current login. Generates a fresh secret and stores it UN-enabled
+// (login flow only requires 2FA once two_factor_enabled=1), overwriting any
+// previous not-yet-confirmed secret so re-scanning always works cleanly.
+auth.post('/2fa/setup', requireAuth, async (c) => {
+  const user = c.var.user!
+  const secret = randomBase32Secret()
+  await setTwoFactorSecret(c.env.DB, user.id, secret)
+  const otpauthUrl = buildOtpAuthUrl(secret, user.username)
+  return c.json({ ok: true, data: { secret, otpauthUrl } })
+})
+
+// POST /api/v1/auth/2fa/confirm  { code } -> { ok, twoFactorEnabled: true }
+// Verifies the 6-digit code generated from the secret issued by /2fa/setup,
+// then turns 2FA ON for the account.
+auth.post('/2fa/confirm', requireAuth, async (c) => {
+  const user = c.var.user!
+  const body = await c.req.json().catch(() => null)
+  if (!body || typeof body.code !== 'string') {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu code' } }, 400)
+  }
+  const userRow = await findUserById(c.env.DB, user.id)
+  if (!userRow || !userRow.two_factor_secret) {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Chưa khởi tạo 2FA — gọi /2fa/setup trước' } }, 400)
+  }
+  const ok = await verifyTotp(userRow.two_factor_secret, body.code)
+  if (!ok) {
+    return c.json({ ok: false, error: { code: 'INVALID_2FA_CODE', message: 'Mã xác thực không đúng' } }, 401)
+  }
+  await setTwoFactorEnabled(c.env.DB, user.id, true)
+  await insertAuditLog(c.env.DB, {
+    id: newUuid(), actorId: user.id, action: 'update', objectType: 'user', objectId: user.id,
+    objectLabel: user.name, detail: 'Bật xác thực 2 lớp (2FA)',
+    ip: c.req.header('CF-Connecting-IP') ?? null, userAgent: c.req.header('User-Agent') ?? null,
+  })
+  return c.json({ ok: true, data: { ok: true, twoFactorEnabled: true } })
+})
+
+// POST /api/v1/auth/2fa/disable  { code } -> { ok, twoFactorEnabled: false }
+// Requires a currently-valid code (not just being logged in) so a hijacked
+// session token alone cannot turn off 2FA protection.
+auth.post('/2fa/disable', requireAuth, async (c) => {
+  const user = c.var.user!
+  const body = await c.req.json().catch(() => null)
+  if (!body || typeof body.code !== 'string') {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu code' } }, 400)
+  }
+  const userRow = await findUserById(c.env.DB, user.id)
+  if (!userRow || !userRow.two_factor_enabled || !userRow.two_factor_secret) {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: '2FA chưa được bật' } }, 400)
+  }
+  const ok = await verifyTotp(userRow.two_factor_secret, body.code)
+  if (!ok) {
+    return c.json({ ok: false, error: { code: 'INVALID_2FA_CODE', message: 'Mã xác thực không đúng' } }, 401)
+  }
+  await setTwoFactorEnabled(c.env.DB, user.id, false)
+  await setTwoFactorSecret(c.env.DB, user.id, null)
+  await insertAuditLog(c.env.DB, {
+    id: newUuid(), actorId: user.id, action: 'update', objectType: 'user', objectId: user.id,
+    objectLabel: user.name, detail: 'Tắt xác thực 2 lớp (2FA)',
+    ip: c.req.header('CF-Connecting-IP') ?? null, userAgent: c.req.header('User-Agent') ?? null,
+  })
+  return c.json({ ok: true, data: { ok: true, twoFactorEnabled: false } })
+})
+
+// GET /api/v1/auth/2fa/status -> { twoFactorEnabled }
+auth.get('/2fa/status', requireAuth, async (c) => {
+  return c.json({ ok: true, data: { twoFactorEnabled: !!c.var.user!.twoFactorEnabled } })
 })
 
 export default auth
