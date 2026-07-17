@@ -67,13 +67,16 @@ users.post('/', requirePermission('admin.manage'), async (c) => {
   const id = newUuid()
   const password = body.password || `Cattuong@${new Date().getFullYear()}`
   const { hash, salt } = await hashPassword(password)
+  // active defaults to 1 (DB DEFAULT) when omitted; explicit true/false from
+  // the client is honored so admins can create a pre-disabled account.
+  const active = typeof body.active === 'boolean' ? (body.active ? 1 : 0) : 1
 
   await c.env.DB
     .prepare(
-      `INSERT INTO users (id, username, email, password_hash, password_salt, name, business_title, unit_code, short_label, gradient_class, phone, avatar_url, role_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO users (id, username, email, password_hash, password_salt, name, business_title, unit_code, short_label, gradient_class, phone, avatar_url, role_id, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, body.username, body.email ?? null, hash, salt, body.name, body.businessTitle ?? null, body.unitCode ?? null, body.shortLabel ?? (body.name as string).slice(0, 2).toUpperCase(), body.gradientClass ?? 'grad-a', body.phone ?? null, body.avatarUrl ?? null, body.roleId)
+    .bind(id, body.username, body.email ?? null, hash, salt, body.name, body.businessTitle ?? null, body.unitCode ?? null, body.shortLabel ?? (body.name as string).slice(0, 2).toUpperCase(), body.gradientClass ?? 'grad-a', body.phone ?? null, body.avatarUrl ?? null, body.roleId, active)
     .run()
 
   await insertAuditLog(c.env.DB, {
