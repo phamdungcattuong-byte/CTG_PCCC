@@ -1489,3 +1489,54 @@ body.dev-tablet .menu-btn { display: grid; }
     transition-duration: .01ms !important;
   }
 }
+
+/* ================================================================
+   LOGIN PAGE + FORCE-CHANGE-PASSWORD OVERLAY
+   Not present in the original design handoff (prototype assumed an
+   already-authenticated session) — these classes were added by dev
+   for the real login flow (src/routes/pages.tsx, public/static/js/
+   bootstrap.js#showForceChangePasswordModal) but never got matching
+   CSS, so both rendered unstyled/broken. Built here reusing existing
+   design tokens (.card, --bg-*, --teal*, --r-lg, --shadow-lg) so it
+   stays visually consistent with the rest of the app.
+   ================================================================ */
+.login-page {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 20% 15%, var(--backdrop-a), transparent 45%),
+    radial-gradient(circle at 85% 80%, var(--backdrop-b), transparent 45%),
+    var(--bg-0);
+  overflow-y: auto;
+}
+.login-card {
+  width: 100%; max-width: 420px;
+  padding: 32px 30px 26px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+}
+.login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.login-brand .brand-logo { width: 44px; height: 44px; }
+.login-brand .brand-name { font-size: 15px; }
+.login-title { font-size: 22px; font-weight: 700; color: var(--ink-heading); margin: 4px 0 2px; letter-spacing: -.005em; }
+.login-sub { margin-bottom: 22px; }
+.login-form { display: flex; flex-direction: column; }
+.login-label { display: block; margin: 14px 0 6px; color: var(--ink-2); }
+.login-form input {
+  width: 100%;
+  background: var(--bg-4);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--font);
+}
+.login-form input:focus { outline: none; border-color: var(--teal-glow); box-shadow: 0 0 0 3px rgba(52,211,153,.18); }
+.login-error { margin-top: 14px; }
+.login-submit { width: 100%; margin-top: 22px; }
+.login-foot { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); line-height: 1.6; }
+/* Force-change-password modal (bootstrap.js#showForceChangePasswordModal)
+   reuses .login-page as its full-screen scrim; it sets z-index:9999 inline
+   (higher than the base z-index:50 here) so it sits above the app shell. */
