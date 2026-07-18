@@ -1,8 +1,8 @@
 # MA TRẬN TRUY VẾT (TRACEABILITY MATRIX)
 ## Hệ thống CTG Command Center — PCLB · PCCC · Cát Tường Group
 
-**Ngày lập**: 2026-07-18
-**Phiên bản**: 1.0
+**Ngày lập**: 2026-07-18 · **Cập nhật lần cuối**: 2026-07-18 (v1.1)
+**Phiên bản**: 1.1
 **Mục đích**: Bảo đảm mọi phát hiện AS-IS (GAP-xx/BR-xx) đều được truy vết xuyên suốt qua toàn bộ chuỗi tài liệu: Phát hiện → Yêu cầu nghiệp vụ (BRD) → Đặc tả kỹ thuật (SRS) → Use Case/User Story (UC/US) → Hạng mục Backlog → Kịch bản UAT/Sign-off. Không có mắt xích nào "rơi" giữa đường — nếu có khoảng trống, được ghi nhận rõ ràng thay vì bỏ sót.
 **Quy ước nhãn**: 🟢 VERIFIED · 🟡 INFERRED · 🟠 ASSUMED — áp dụng cho cột "Trạng thái quyết định" (đã sửa/chưa sửa/cần sign-off).
 **Nguồn**: `GAP-ANALYSIS.md`, `PROCESS-RBAC-MODEL.md`, `BRD.md`, `SRS.md`, `USE-CASES.md`, `BACKLOG.md`, `UAT-SCENARIOS.md`.
