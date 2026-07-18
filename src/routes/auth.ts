@@ -148,8 +148,21 @@ auth.post('/2fa/login-verify', async (c) => {
 })
 
 // POST /api/v1/auth/logout
+// SECURITY: must revoke the refresh_tokens row backing this session's
+// ctg_refresh cookie — otherwise a copy of that cookie (stolen via XSS,
+// left in browser history, etc.) would keep working against /auth/refresh
+// forever (up to its 30-day expiry) even after the user explicitly logs
+// out. Found via test case TC10 (see /tmp/pentest/run_tests.sh).
 auth.post('/logout', requireAuth, async (c) => {
   const user = c.var.user!
+  const refreshPlain = getCookie(c, REFRESH_COOKIE_NAME)
+  if (refreshPlain) {
+    const refreshHash = await hashRefreshToken(refreshPlain)
+    await c.env.DB
+      .prepare(`UPDATE refresh_tokens SET revoked_at = datetime('now') WHERE token_hash = ? AND revoked_at IS NULL`)
+      .bind(refreshHash)
+      .run()
+  }
   await markUserOffline(c.env.DB, user.id)
   deleteCookie(c, ACCESS_COOKIE_NAME, { path: '/' })
   deleteCookie(c, REFRESH_COOKIE_NAME, { path: '/' })
