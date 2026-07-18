@@ -64,6 +64,10 @@ Envelope phản hồi thống nhất: `{ok:true, data}` hoặc `{ok:false, error
 - **Buộc đổi mật khẩu lần đầu**: toàn bộ 24 tài khoản seed có cờ `must_change_password = 1`. Khi đăng nhập, nếu cờ này = true, app shell hiển thị modal chặn buộc đổi mật khẩu trước khi vào hệ thống (`bootstrap.js` → `showForceChangePasswordModal`). Gọi `POST /auth/change-password` với mật khẩu hiện tại đúng + mật khẩu mới (≥ 8 ký tự, khác mật khẩu cũ) sẽ tự xóa cờ này.
 - Migration: `migrations/0005_security_hardening.sql` (thêm cột `must_change_password` vào `users`, bảng `login_attempts`).
 
+## Khảo sát nghiệp vụ (Business Analysis Audit) — bổ sung 18/07/2026
+- Đã thực hiện đợt khảo sát AS-IS/thiết kế TO-BE toàn diện: rà soát UI/API/schema/luồng thực tế, phát hiện 28 vấn đề (9 GAP + 21 Business Rule), lập BRD/SRS/Use Case/User Story/Backlog/Ma trận truy vết/Kịch bản UAT — toàn bộ ở `docs/audit/`, bắt đầu đọc từ **[`docs/audit/README.md`](./docs/audit/README.md)**.
+- **Chưa sửa mã nguồn** cho các phát hiện này (trừ 1 bug rõ ràng đã sửa) — đúng nguyên tắc "chỉ triển khai mã nguồn khi phát hiện lỗi thật"; các vấn đề còn lại (đặc biệt 2 rủi ro P0: kiểm soát phân quyền Sự cố khẩn cấp, lộ PII danh bạ qua file tĩnh) đang **chờ sign-off nghiệp vụ** trước khi code — xem `docs/audit/BACKLOG.md` và `docs/audit/UAT-SCENARIOS.md` Phần 1.
+
 ## Trạng thái GitHub
 ✅ Đã kết nối — repository https://github.com/phamdungcattuong-byte/CTG_PCCC, branch `main`, đã push toàn bộ lịch sử commit (commit mới nhất `436f44f`).
 
