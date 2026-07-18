@@ -1534,6 +1534,21 @@ body.dev-tablet .menu-btn { display: grid; }
   font-family: var(--font);
 }
 .login-form input:focus { outline: none; border-color: var(--teal-glow); box-shadow: 0 0 0 3px rgba(52,211,153,.18); }
+/* Password show/hide toggle (public/static/js/password-toggle.js).
+   .login-password-wrap replaces the bare <input> as the direct child of
+   .login-form so the existing `.login-form input` rules above still apply
+   unchanged; the toggle button is absolutely positioned inside it. */
+.login-password-wrap { position: relative; }
+.login-password-wrap input { padding-right: 40px; }
+.login-pw-toggle {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: var(--r-sm);
+  color: var(--ink-3); cursor: pointer; padding: 0;
+}
+.login-pw-toggle:hover { color: var(--ink-2); background: var(--bg-3); }
+.login-pw-toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(52,211,153,.18); color: var(--teal-glow); }
 .login-error { margin-top: 14px; }
 .login-submit { width: 100%; margin-top: 22px; }
 .login-foot { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); line-height: 1.6; }

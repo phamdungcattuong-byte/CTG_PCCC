@@ -28,17 +28,25 @@
       overlay.style.position = 'fixed';
       overlay.style.inset = '0';
       overlay.style.zIndex = '9999';
+      // Password-visibility toggle button markup, shared across all three
+      // fields below; behaviour is wired globally by password-toggle.js
+      // (event delegation on .login-pw-toggle inside .login-password-wrap).
+      var eyeSvg =
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+      function pwToggleBtn() {
+        return '<button type="button" class="login-pw-toggle" aria-label="Hiện mật khẩu" aria-pressed="false" tabindex="-1">' + eyeSvg + '</button>';
+      }
       overlay.innerHTML =
         '<div class="login-card card">' +
         '  <h1 class="login-title">Đổi mật khẩu bắt buộc</h1>' +
         '  <p class="muted small login-sub">Tài khoản của bạn đang dùng mật khẩu mặc định. Vui lòng đặt mật khẩu mới trước khi tiếp tục.</p>' +
         '  <form id="fcpForm" class="login-form" autocomplete="off">' +
         '    <label class="small b login-label">Mật khẩu hiện tại</label>' +
-        '    <input id="fcpCurrent" type="password" autocomplete="current-password" required />' +
+        '    <div class="login-password-wrap"><input id="fcpCurrent" type="password" autocomplete="current-password" required />' + pwToggleBtn() + '</div>' +
         '    <label class="small b login-label">Mật khẩu mới (tối thiểu 8 ký tự)</label>' +
-        '    <input id="fcpNew" type="password" autocomplete="new-password" minlength="8" required />' +
+        '    <div class="login-password-wrap"><input id="fcpNew" type="password" autocomplete="new-password" minlength="8" required />' + pwToggleBtn() + '</div>' +
         '    <label class="small b login-label">Nhập lại mật khẩu mới</label>' +
-        '    <input id="fcpConfirm" type="password" autocomplete="new-password" minlength="8" required />' +
+        '    <div class="login-password-wrap"><input id="fcpConfirm" type="password" autocomplete="new-password" minlength="8" required />' + pwToggleBtn() + '</div>' +
         '    <div id="fcpError" class="alert-box ab-crit login-error" style="display:none"></div>' +
         '    <button type="submit" class="btn btn-primary btn-lg login-submit" id="fcpSubmit">Đổi mật khẩu</button>' +
         '  </form>' +

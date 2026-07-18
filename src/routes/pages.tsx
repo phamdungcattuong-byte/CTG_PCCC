@@ -39,7 +39,12 @@ pages.get('/login', (c) => {
           <input id="loginUsername" name="username" placeholder="ví dụ: ct, tgd, cht…" autocomplete="username" required />
 
           <label class="small b login-label">Mật khẩu</label>
-          <input id="loginPassword" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+          <div class="login-password-wrap">
+            <input id="loginPassword" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+            <button type="button" class="login-pw-toggle" aria-label="Hiện mật khẩu" aria-pressed="false" tabindex="-1">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z" /><circle cx="12" cy="12" r="3" /></svg>
+            </button>
+          </div>
 
           <div id="loginError" class="alert-box ab-crit login-error" style="display:none"></div>
 
@@ -63,6 +68,7 @@ pages.get('/login', (c) => {
         </div>
       </div>
       <script src="/static/js/api-client.js"></script>
+      <script src="/static/js/password-toggle.js"></script>
       <script src="/static/js/login.js"></script>
     </div>
   )
@@ -752,6 +758,7 @@ function AppShell() {
       <script src="/static/js/admin-override.js"></script>
       <script src="/static/js/camera-admin.js"></script>
       <script src="/static/js/twofa.js"></script>
+      <script src="/static/js/password-toggle.js"></script>
       <script src="/static/js/bootstrap.js"></script>
     </>
   )
