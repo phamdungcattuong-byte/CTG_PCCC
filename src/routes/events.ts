@@ -36,6 +36,12 @@ events.post('/events/activate', requireAnyPermission('activate'), async (c) => {
   if (!body || typeof body.level !== 'number' || typeof body.name !== 'string') {
     return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu level hoặc name' } }, 400)
   }
+  // BUGFIX: events.level has FOREIGN KEY REFERENCES levels(k), valid range 0-4.
+  // An out-of-range level would previously hit an unhandled D1 FK constraint
+  // error -> generic 500. Validate explicitly and reject with a clear 400.
+  if (!Number.isInteger(body.level) || body.level < 0 || body.level > 4) {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'level phải là số nguyên từ 0 đến 4' } }, 400)
+  }
   const idempotencyKey = c.req.header('Idempotency-Key') || body.idempotencyKey || null
   const db = c.env.DB
   const user = c.var.user!

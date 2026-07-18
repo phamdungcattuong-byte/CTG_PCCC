@@ -23,8 +23,21 @@ incidents.post('/', async (c) => {
   const user = c.var.user!
   const level = body.level ?? 3 // fire/flood default to Cấp 3 ĐỎ per prototype's reportFireAt
 
+  // BUGFIX: events.level has FOREIGN KEY REFERENCES levels(k), valid range 0-4.
+  // An out-of-range level (e.g. negative, or > 4) previously hit an unhandled
+  // D1 FK constraint error -> generic 500. Validate explicitly.
+  if (!Number.isInteger(level) || level < 0 || level > 4) {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'level phải là số nguyên từ 0 đến 4' } }, 400)
+  }
+
   const eventId = newUuid()
   const site = body.siteId ? await db.prepare('SELECT * FROM sites WHERE id = ?').bind(body.siteId).first<any>() : null
+  // BUGFIX: incidents.site_id has a FOREIGN KEY constraint to sites(id). If the
+  // caller supplied a siteId that doesn't exist, inserting it raw would throw an
+  // unhandled D1 FOREIGN KEY constraint error -> generic 500. Reject explicitly.
+  if (body.siteId && !site) {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'siteId không tồn tại' } }, 400)
+  }
   const eventName = body.eventName || (site ? `${body.type === 'fire' ? 'Cháy' : 'Sự cố'} tại ${site.name}` : `Sự cố ${body.type}`)
 
   await db
