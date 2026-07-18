@@ -99,10 +99,13 @@ Envelope phản hồi thống nhất: `{ok:true, data}` hoặc `{ok:false, error
 - [x] Test full trên URL production thật (`https://03c19794-534c-4832-b179-50d9bc9ca041.vip.gensparksite.com`): login `ct` → hỏi AI thật (trả lời tiếng Việt đúng ngữ cảnh QĐ.03) → tạo/xem/xoá camera → ghi + xem cảnh báo an ninh → **RBAC**: login `atv` (role `duty`) xem camera + báo cảnh báo được (200/201) nhưng tạo camera bị chặn đúng (403 `INSUFFICIENT_PERMISSIONS`). Trang chủ chứa đủ nav/section/modal/script mới.
 - [x] Dọn dữ liệu test khỏi D1 production (`camera_alerts`, `cameras`, `ai_chat_logs` đều rỗng trở lại).
 
+## Redeploy production — HOÀN TẤT (18/07/2026)
+- [x] `gsk hosted deploy` — redeploy Worker thành công (không cần rebuild DB, không có migration mới), đưa lên production: fix CSS trang đăng nhập (`.login-page`/`.login-card`, commit `bf771ca`) và tính năng hiện/ẩn mật khẩu (`password-toggle.js`, commit `436f44f`).
+- [x] Verify qua Playwright (headless Chromium) thật trên URL production (`https://03c19794-534c-4832-b179-50d9bc9ca041.vip.gensparksite.com`): icon con mắt đổi `type` giữa password/text đúng trên `/login`; đăng nhập `tgd`/`Cattuong@2026` thành công → hiện modal "Đổi mật khẩu bắt buộc" (đúng hành vi vì tài khoản chưa đổi mật khẩu mặc định) → cả 3 icon con mắt trong modal cũng hoạt động đúng.
+
 ## Việc chưa hoàn thành / Cần làm tiếp
 - [ ] Cân nhắc thêm `Idempotency-Key` cho `confirmActivate` để chống double-click kích hoạt trùng.
 - [ ] Đổi mật khẩu thật cho 24 tài khoản — cờ `must_change_password` đã bắt buộc điều này ngay lần đăng nhập đầu tiên của mọi người dùng thật, nhưng admin nên chủ động nhắc người dùng thực hiện.
-- [ ] Redeploy production để đưa fix CSS trang đăng nhập (`.login-page`/`.login-card`) và tính năng hiện/ẩn mật khẩu lên bản live.
 
 ## Triển khai
 - **Platform**: Cloudflare Workers (Genspark Hosted Deploy — Workers for Platform, tài khoản Cloudflare do Genspark quản lý)
