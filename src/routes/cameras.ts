@@ -84,6 +84,13 @@ cameras.post('/', requirePermission('camera.manage'), async (c) => {
   if (!body.hlsUrl && !body.embedUrl) {
     return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Cần ít nhất 1 URL luồng (HLS hoặc Embed)' } }, 400)
   }
+  // BUGFIX: cameras.site_id has FOREIGN KEY REFERENCES sites(id). If the caller
+  // supplied a siteId that doesn't exist, inserting it raw would throw an
+  // unhandled D1 FOREIGN KEY constraint error -> generic 500. Reject explicitly.
+  if (body.siteId) {
+    const site = await c.env.DB.prepare('SELECT id FROM sites WHERE id = ?').bind(body.siteId).first()
+    if (!site) return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'siteId không tồn tại' } }, 400)
+  }
   const user = c.var.user!
   const id = newUuid()
   await c.env.DB
@@ -116,6 +123,11 @@ cameras.patch('/:id', requirePermission('camera.manage'), async (c) => {
   const body = await c.req.json().catch(() => null)
   const existing: any = await c.env.DB.prepare('SELECT * FROM cameras WHERE id = ?').bind(id).first()
   if (!existing) return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Không tìm thấy camera' } }, 404)
+  // BUGFIX: same FK risk as POST / — validate siteId before UPDATE if provided.
+  if (body?.siteId) {
+    const site = await c.env.DB.prepare('SELECT id FROM sites WHERE id = ?').bind(body.siteId).first()
+    if (!site) return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'siteId không tồn tại' } }, 400)
+  }
   const user = c.var.user!
   await c.env.DB
     .prepare(

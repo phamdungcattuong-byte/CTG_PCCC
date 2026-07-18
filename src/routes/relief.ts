@@ -13,6 +13,20 @@ import { insertAuditLog } from '../lib/db'
 const relief = new Hono<AppEnv>()
 relief.use('*', requireAuth)
 
+// BUGFIX: every relief_* sub-resource table has project_id TEXT NOT NULL
+// REFERENCES relief_projects(id). None of the sub-resource POST/PATCH routes
+// were checking the parent project actually exists (nor is soft-deleted)
+// before inserting — an unknown/deleted :id hit an unhandled D1 FOREIGN KEY
+// constraint error -> generic 500. Call this first in every mutating
+// sub-resource handler and short-circuit with a clean 404 if missing.
+async function requireProject(c: any, db: D1Database, id: string) {
+  const project = await db.prepare('SELECT id FROM relief_projects WHERE id = ? AND deleted_at IS NULL').bind(id).first<{ id: string }>()
+  if (!project) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Không tìm thấy dự án cứu trợ' } }, 404)
+  }
+  return null
+}
+
 async function loadProjectFull(db: D1Database, id: string) {
   const project = await db.prepare('SELECT * FROM relief_projects WHERE id = ? AND deleted_at IS NULL').bind(id).first<any>()
   if (!project) return null
@@ -141,7 +155,14 @@ relief.get('/:id/team', async (c) => {
 })
 relief.post('/:id/team', requirePermission('relief.manage'), async (c) => {
   const id = c.req.param('id')
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
   const body = await c.req.json().catch(() => null)
+  // BUGFIX: person_id has FK REFERENCES users(id) — validate before insert.
+  if (body?.personId) {
+    const person = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(body.personId).first()
+    if (!person) return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'personId không tồn tại' } }, 400)
+  }
   const memberId = newUuid()
   await c.env.DB
     .prepare('INSERT INTO relief_team_members (id, project_id, person_id, role_label, phone) VALUES (?, ?, ?, ?, ?)')
@@ -164,6 +185,8 @@ relief.get('/:id/vehicles', async (c) => {
 })
 relief.post('/:id/vehicles', requirePermission('relief.manage'), async (c) => {
   const id = c.req.param('id')
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
   const body = await c.req.json().catch(() => null)
   const vid = newUuid()
   await c.env.DB
@@ -199,6 +222,8 @@ relief.get('/:id/cargo', async (c) => {
 })
 relief.post('/:id/cargo', requirePermission('relief.manage'), async (c) => {
   const id = c.req.param('id')
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
   const body = await c.req.json().catch(() => null)
   if (!body || typeof body.item !== 'string') return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu item' } }, 400)
   const cid = newUuid()
@@ -231,8 +256,15 @@ relief.get('/:id/itinerary', async (c) => {
 })
 relief.post('/:id/itinerary', requirePermission('relief.manage'), async (c) => {
   const id = c.req.param('id')
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
   const body = await c.req.json().catch(() => null)
   if (!body || typeof body.day !== 'number') return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu day' } }, 400)
+  // BUGFIX: relief_itinerary has UNIQUE(project_id, day) — inserting a
+  // duplicate day for the same project previously hit an unhandled D1
+  // UNIQUE constraint error -> generic 500. Reject explicitly with a 409.
+  const dup = await c.env.DB.prepare('SELECT id FROM relief_itinerary WHERE project_id = ? AND day = ?').bind(id, body.day).first()
+  if (dup) return c.json({ ok: false, error: { code: 'CONFLICT', message: `Ngày ${body.day} đã tồn tại trong hành trình, dùng PATCH để sửa` } }, 409)
   const iid = newUuid()
   await c.env.DB
     .prepare('INSERT INTO relief_itinerary (id, project_id, day, date_label, from_label, to_label, distance_label, activities, sleep_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -267,8 +299,15 @@ relief.get('/:id/tasks', async (c) => {
 })
 relief.post('/:id/tasks', requireAnyPermission('relief.manage', 'team.lead'), async (c) => {
   const id = c.req.param('id')
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
   const body = await c.req.json().catch(() => null)
   if (!body || typeof body.title !== 'string') return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu title' } }, 400)
+  // BUGFIX: owner_id has FK REFERENCES users(id) — validate before insert.
+  if (body.ownerId) {
+    const owner = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(body.ownerId).first()
+    if (!owner) return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'ownerId không tồn tại' } }, 400)
+  }
   const tid = newUuid()
   await c.env.DB
     .prepare('INSERT INTO relief_tasks (id, project_id, title, owner_id, deadline, status) VALUES (?, ?, ?, ?, ?, ?)')
@@ -282,6 +321,10 @@ relief.patch('/:id/tasks/:tid', requireAnyPermission('relief.manage', 'team.lead
   const body = await c.req.json().catch(() => null)
   const existing: any = await c.env.DB.prepare('SELECT * FROM relief_tasks WHERE id = ?').bind(tid).first()
   if (!existing) return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Không tìm thấy nhiệm vụ' } }, 404)
+  if (body?.ownerId) {
+    const owner = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(body.ownerId).first()
+    if (!owner) return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'ownerId không tồn tại' } }, 400)
+  }
   await c.env.DB
     .prepare('UPDATE relief_tasks SET title=?, owner_id=?, deadline=?, status=? WHERE id=?')
     .bind(body?.title ?? existing.title, body?.ownerId ?? existing.owner_id, body?.deadline ?? existing.deadline, body?.status ?? existing.status, tid)
@@ -304,6 +347,8 @@ relief.get('/:id/logs', async (c) => {
 })
 relief.post('/:id/logs', requireAnyPermission('relief.manage', 'team.lead'), async (c) => {
   const id = c.req.param('id')
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
   const user = c.var.user!
   const contentType = c.req.header('Content-Type') || ''
   let message = ''
@@ -368,8 +413,14 @@ relief.get('/:id/approvals', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT * FROM relief_approvals WHERE project_id = ?').bind(c.req.param('id')).all()
   return c.json({ ok: true, data: results })
 })
+const VALID_APPROVAL_ROLES = ['ct', 'tgd', 'congdoan', 'phapche']
 relief.post('/:id/approvals/:role', requireAnyPermission('approve.high', 'relief.manage'), async (c) => {
   const { id, role } = c.req.param()
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
+  if (!VALID_APPROVAL_ROLES.includes(role)) {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: `role phải là một trong: ${VALID_APPROVAL_ROLES.join(', ')}` } }, 400)
+  }
   const body = await c.req.json().catch(() => null)
   if (!body || typeof body.decision !== 'string') return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu decision' } }, 400)
   await c.env.DB
@@ -405,9 +456,16 @@ relief.get('/:id/expenses', async (c) => {
 })
 relief.post('/:id/expenses', requireAnyPermission('relief.manage', 'budget.commit'), async (c) => {
   const id = c.req.param('id')
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
   const body = await c.req.json().catch(() => null)
   if (!body || typeof body.item !== 'string' || typeof body.amount !== 'number') {
     return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'Thiếu item hoặc amount' } }, 400)
+  }
+  // BUGFIX: a zero/negative amount would silently corrupt budget_spent
+  // (it's additive: budget_spent = budget_spent + amount) with no validation.
+  if (!(body.amount > 0)) {
+    return c.json({ ok: false, error: { code: 'VALIDATION_FAILED', message: 'amount phải lớn hơn 0' } }, 400)
   }
   const eid = newUuid()
   await c.env.DB
@@ -428,6 +486,8 @@ relief.get('/:id/reports', async (c) => {
 })
 relief.post('/:id/reports/:type', requirePermission('relief.manage'), async (c) => {
   const { id, type } = c.req.param()
+  const notFound = await requireProject(c, c.env.DB, id)
+  if (notFound) return notFound
   const contentType = c.req.header('Content-Type') || ''
   let r2Key: string | null = null
   if (contentType.includes('multipart/form-data')) {
