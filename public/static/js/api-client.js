@@ -108,12 +108,19 @@
         people: row.beneficiaries_people || 0,
         priority: row.beneficiaryPriorities || [],
       },
-      team: (row.team || []).map((t) => ({ personId: t.person_id, role: t.role, phone: t.phone })),
-      vehicles: (row.vehicles || []).map((v) => ({ id: v.id, type: v.vehicle_type, plate: v.plate, driver: v.driver, capacity: v.capacity })),
+      // BUGFIX (audit finding): field names below were mismatched against
+      // migrations/0003_relief_projects.sql — schema uses role_label, type,
+      // date_label/from_label/to_label/distance_label, and decision (not
+      // role, vehicle_type, date/from_place/to_place/distance, status).
+      // Result before this fix: team role, vehicle type, itinerary date/
+      // from/to/distance and the approvals status were always undefined
+      // once real D1 data replaced the demo in-memory arrays.
+      team: (row.team || []).map((t) => ({ personId: t.person_id, role: t.role_label, phone: t.phone })),
+      vehicles: (row.vehicles || []).map((v) => ({ id: v.id, type: v.type, plate: v.plate, driver: v.driver, capacity: v.capacity })),
       cargo: (row.cargo || []).map((c) => ({ id: c.id, item: c.item, qty: c.qty, unit: c.unit, total: c.total_label, per: c.per_label, cost: c.cost })),
-      itinerary: (row.itinerary || []).map((it) => ({ day: it.day, date: it.date, from: it.from_place, to: it.to_place, distance: it.distance, activities: it.activities, sleepAt: it.sleep_at })),
+      itinerary: (row.itinerary || []).map((it) => ({ day: it.day, date: it.date_label, from: it.from_label, to: it.to_label, distance: it.distance_label, activities: it.activities, sleepAt: it.sleep_at })),
       tasks: (row.tasks || []).map((t) => ({ id: t.id, title: t.title, owner: t.owner_id, deadline: t.deadline, status: t.status })),
-      approvals: (row.approvals || []).reduce((acc, a) => { acc[a.role] = a.status; return acc; }, {}),
+      approvals: (row.approvals || []).reduce((acc, a) => { acc[a.role] = a.decision; return acc; }, {}),
       logs: [],
       media: [],
       outcome: row.outcome_households != null ? {
